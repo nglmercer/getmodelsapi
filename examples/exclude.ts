@@ -3,7 +3,7 @@ import { getModels } from "../src/api/index";
 
 // Exclude specific providers
 const models = await getModels({
-  exclude: ["huggingface", "openrouter"],
+  exclude: ["huggingface"],
   free: true,
 });
 

@@ -41,14 +41,60 @@ function deduceFeatures(id: string, description: string, name: string): string[]
   return features;
 }
 
+function normalizeForMatch(text: string): string {
+  return text
+    .replace(/^mistral\//, '')
+    .replace(/^mistralai\//, '')
+    .replace(/^mistral:\s*/i, '')
+    .replace(/^\d{4}\s+/, '')
+    .replace(/\s+\d{4}$/, '')
+    .replace(/\s+\d+b$/i, '')
+    .replace(/-latest$/, '')
+    .replace(/-(\d{4}-\d{2}-\d{2})$/, '')
+    .replace(/--+/g, '-')
+    .replace(/-$/, '')
+    .toLowerCase();
+}
+
+async function getContextFromOpenRouter(): Promise<Map<string, number>> {
+  try {
+    const response = await axios.get('https://openrouter.ai/api/v1/models', {
+      timeout: 10000,
+    });
+    const map = new Map<string, number>();
+    if (Array.isArray(response.data?.data)) {
+      for (const m of response.data.data) {
+        if ((m.id?.startsWith('mistral/') || m.id?.startsWith('mistralai/')) && m.context_length > 0) {
+          const nameKey = normalizeForMatch(m.name || '');
+          const idKey = normalizeForMatch(m.id);
+          const existing = map.get(nameKey);
+          if (!existing || m.context_length > existing) {
+            map.set(nameKey, m.context_length);
+          }
+          const idExisting = map.get(idKey);
+          if (!idExisting || m.context_length > idExisting) {
+            map.set(idKey, m.context_length);
+          }
+        }
+      }
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 async function scrapeMistralPage(): Promise<Model[]> {
-  const response = await axios.get('https://docs.mistral.ai/getting-started/models/', {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 GetModels',
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-    timeout: 15000,
-  });
+  const [response, ctxMap] = await Promise.all([
+    axios.get('https://docs.mistral.ai/getting-started/models/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 GetModels',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      timeout: 15000,
+    }),
+    getContextFromOpenRouter(),
+  ]);
 
   const $ = cheerio.load(response.data);
   const seen = new Set<string>();
@@ -95,7 +141,9 @@ async function scrapeMistralPage(): Promise<Model[]> {
     if (seen.has(id)) return;
     seen.add(id);
 
-    const contextWindow = parseContextWindow(sectionText);
+    const scrapedCtx = parseContextWindow(sectionText);
+    const orCtx = ctxMap.get(normalizeForMatch(name)) || ctxMap.get(id) || ctxMap.get(normalizeForMatch(id));
+    const contextWindow = orCtx || scrapedCtx || 32768;
     const features = deduceFeatures(id, sectionText, name);
 
     models.push({
