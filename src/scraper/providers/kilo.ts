@@ -1,4 +1,4 @@
-import axios from "axios";
+import http from "../../utils/http";
 import type { Model, ProviderConfig, ScraperResult } from "./index";
 
 interface KiloModel {
@@ -35,7 +35,7 @@ export async function scrapeKilo(
   _config: ProviderConfig,
 ): Promise<ScraperResult> {
   try {
-    const response = await axios.get("https://kilo.ai/api/models", {
+    const response = await http.get("https://kilo.ai/api/models", {
       timeout: 15000,
     });
 

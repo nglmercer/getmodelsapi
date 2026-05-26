@@ -1,4 +1,4 @@
-import axios from 'axios';
+import http from '../../utils/http';
 import type { Model, ProviderConfig, ScraperResult } from './index';
 
 interface NovitaModel {
@@ -26,7 +26,7 @@ function parseFeatures(features: string[]): string[] {
 
 export async function scrapeNovita(_config: ProviderConfig): Promise<ScraperResult> {
   try {
-    const response = await axios.get('https://api.novita.ai/v3/openai/models', {
+    const response = await http.get('https://api.novita.ai/v3/openai/models', {
       timeout: 15000,
     });
 

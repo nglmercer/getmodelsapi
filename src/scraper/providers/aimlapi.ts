@@ -1,5 +1,5 @@
-import axios from 'axios';
-import type { Model, ProviderConfig, ScraperResult } from './index';
+import http from "../../utils/http";
+import type { Model, ProviderConfig, ScraperResult } from "./index";
 
 interface AIMLAPIModel {
   id: string;
@@ -17,30 +17,40 @@ interface AIMLAPIModel {
 }
 
 function parseFeatures(features: string[]): string[] {
-  const feat = features.map(f => f.toLowerCase());
+  const feat = features.map((f) => f.toLowerCase());
   const result: string[] = [];
-  if (feat.some(f => f.includes('chat') || f.includes('completion'))) result.push('chat');
-  if (feat.some(f => f.includes('vision') || f.includes('image'))) result.push('vision');
-  if (feat.some(f => f.includes('function') || f.includes('tool'))) result.push('tools');
-  if (feat.some(f => f.includes('audio') || f.includes('speech'))) result.push('audio');
-  if (result.length === 0) result.push('chat');
+  if (feat.some((f) => f.includes("chat") || f.includes("completion")))
+    result.push("chat");
+  if (feat.some((f) => f.includes("vision") || f.includes("image")))
+    result.push("vision");
+  if (feat.some((f) => f.includes("function") || f.includes("tool")))
+    result.push("tools");
+  if (feat.some((f) => f.includes("audio") || f.includes("speech")))
+    result.push("audio");
+  if (result.length === 0) result.push("chat");
   return result;
 }
 
-export async function scrapeAIMLAPI(_config: ProviderConfig): Promise<ScraperResult> {
+export async function scrapeAIMLAPI(
+  _config: ProviderConfig,
+): Promise<ScraperResult> {
   try {
-    const response = await axios.get('https://api.aimlapi.com/v1/models', {
+    const response = await http.get("https://api.aimlapi.com/v1/models", {
       timeout: 15000,
     });
 
     if (!Array.isArray(response.data?.data)) {
-      return { success: false, models: [], error: 'Unexpected AIMLAPI response' };
+      return {
+        success: false,
+        models: [],
+        error: "Unexpected AIMLAPI response",
+      };
     }
 
     const models: Model[] = response.data.data.map((m: AIMLAPIModel) => ({
       id: m.id,
       name: m.info.name || m.id,
-      provider: 'aimlapi',
+      provider: "aimlapi",
       gateway: m.info.developer?.toLowerCase() || undefined,
       contextWindow: m.info.contextLength || 4096,
       supportedFeatures: parseFeatures(m.features || []),
@@ -53,7 +63,7 @@ export async function scrapeAIMLAPI(_config: ProviderConfig): Promise<ScraperRes
     return {
       success: false,
       models: [],
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : "Unknown error",
     };
   }
 }

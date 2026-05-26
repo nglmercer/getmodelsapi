@@ -1,4 +1,4 @@
-import axios from 'axios';
+import http from '../../utils/http';
 import type { Model, ProviderConfig, ScraperResult } from './index';
 
 interface SambaNovaModel {
@@ -11,7 +11,7 @@ interface SambaNovaModel {
 
 export async function scrapeSambaNova(_config: ProviderConfig): Promise<ScraperResult> {
   try {
-    const response = await axios.get('https://api.sambanova.ai/v1/models', {
+    const response = await http.get('https://api.sambanova.ai/v1/models', {
       timeout: 15000,
     });
 

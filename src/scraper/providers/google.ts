@@ -1,4 +1,4 @@
-import axios from "axios";
+import http from "../../utils/http";
 import * as cheerio from "cheerio";
 import type { Model, ProviderConfig, ScraperResult } from "./index";
 
@@ -122,7 +122,7 @@ function normalizeForMatch(id: string): string {
 
 async function getContextFromOpenRouter(): Promise<Map<string, number>> {
   try {
-    const response = await axios.get("https://openrouter.ai/api/v1/models", {
+    const response = await http.get("https://openrouter.ai/api/v1/models", {
       timeout: 10000,
     });
     const map = new Map<string, number>();
@@ -146,7 +146,7 @@ async function getContextFromOpenRouter(): Promise<Map<string, number>> {
 
 async function scrapeGooglePage(): Promise<Model[]> {
   const [response, ctxMap] = await Promise.all([
-    axios.get("https://ai.google.dev/gemini-api/docs/models", {
+    http.get("https://ai.google.dev/gemini-api/docs/models", {
       headers: {
         "User-Agent": "Mozilla/5.0 GetModels",
         "Accept-Language": "en-US,en;q=0.9",
@@ -191,7 +191,7 @@ export async function scrapeGoogle(
 ): Promise<ScraperResult> {
   if (config.apiKey) {
     try {
-      const response = await axios.get(`${config.baseUrl}/models`, {
+      const response = await http.get(`${config.baseUrl}/models`, {
         params: { key: config.apiKey },
         timeout: 10000,
       });

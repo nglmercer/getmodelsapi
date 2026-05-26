@@ -1,4 +1,4 @@
-import axios from 'axios';
+import http from '../utils/http';
 import type { Model } from '../types';
 import { cacheGet, cacheSet, ONE_HOUR } from './cache';
 

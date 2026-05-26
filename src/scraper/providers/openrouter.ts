@@ -1,4 +1,4 @@
-import axios from 'axios';
+import http from '../../utils/http';
 import type { Model, ProviderConfig, ScraperResult } from './index';
 
 interface OpenRouterModel {
@@ -33,7 +33,7 @@ function parsePricing(pricing: OpenRouterModel['pricing']): { prompt: number; co
 
 export async function scrapeOpenRouter(_config: ProviderConfig): Promise<ScraperResult> {
   try {
-    const response = await axios.get('https://openrouter.ai/api/v1/models', {
+    const response = await http.get('https://openrouter.ai/api/v1/models', {
       timeout: 15000,
     });
 

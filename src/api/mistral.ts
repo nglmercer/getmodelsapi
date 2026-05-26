@@ -1,4 +1,4 @@
-import axios from 'axios';
+import http from '../utils/http';
 import type { Model, ProviderConfig } from '../types';
 
 interface MistralModel {
@@ -14,7 +14,7 @@ export async function fetchModelsFromMistral(provider: ProviderConfig): Promise<
   if (!provider.apiKey) return [];
 
   try {
-    const response = await axios.get(`${provider.baseUrl}/models`, {
+    const response = await http.get(`${provider.baseUrl}/models`, {
       headers: { 'Authorization': `Bearer ${provider.apiKey}` },
       timeout: 10000,
     });

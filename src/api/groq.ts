@@ -1,4 +1,4 @@
-import axios from 'axios';
+import http from '../utils/http';
 import type { Model, ProviderConfig } from '../types';
 
 export async function fetchModelsFromGroq(provider: ProviderConfig): Promise<Model[]> {
@@ -7,7 +7,7 @@ export async function fetchModelsFromGroq(provider: ProviderConfig): Promise<Mod
   }
 
   try {
-    const response = await axios.get(
+    const response = await http.get(
       `${provider.baseUrl}/models`,
       {
         headers: {

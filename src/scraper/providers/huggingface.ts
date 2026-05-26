@@ -1,5 +1,4 @@
-import axios from 'axios';
-import axiosRetry from 'axios-retry';
+import http, { configureRetry } from '../../utils/http';
 import * as Parser from 'cheerio';
 import type { Model, ProviderConfig, ScraperResult } from './index';
 
