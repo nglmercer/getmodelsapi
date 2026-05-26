@@ -39,4 +39,5 @@ export interface ProviderConfig {
   apiKey?: string;
   supportsScraping: boolean;
   priority: number;
+  freeTier: boolean;
 }

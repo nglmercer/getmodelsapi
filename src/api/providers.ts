@@ -1,7 +1,16 @@
 import axios from 'axios';
-import { Model, ProviderConfig } from '../types';
+import type { Model, ProviderConfig } from '../types';
 
-export interface OpenRouterModel {
+export { fetchModelsFromKilo } from './kilo';
+export { fetchModelsFromGroq } from './groq';
+import { fetchModelsFromGoogle } from './google';
+import { fetchModelsFromMistral } from './mistral';
+import { fetchModelsFromTogether } from './together';
+import { fetchModelsFromCohere } from './cohere';
+import { fetchModelsFromAnthropic } from './anthropic';
+import { fetchModelsFromPerplexity } from './perplexity';
+
+interface OpenRouterModel {
   id: string;
   name: string;
   context_length: number;
@@ -13,9 +22,6 @@ export interface OpenRouterModel {
   description?: string;
   provider: string;
 }
-
-export { fetchModelsFromKilo } from './kilo';
-export { fetchModelsFromGroq } from './groq';
 
 export async function fetchModelsFromOpenRouter(provider: ProviderConfig): Promise<Model[]> {
   if (!provider.apiKey) {
@@ -107,10 +113,16 @@ export async function fetchModelsFromHuggingFace(provider: ProviderConfig): Prom
   }
 }
 
-export const fetchModelsByProvider = {
+export const fetchModelsByProvider: Record<string, (config: ProviderConfig) => Promise<Model[]>> = {
   openrouter: fetchModelsFromOpenRouter,
   kilo: fetchModelsFromKilo,
   groq: fetchModelsFromGroq,
   ollama: fetchModelsFromOllama,
   huggingface: fetchModelsFromHuggingFace,
+  google: fetchModelsFromGoogle,
+  mistral: fetchModelsFromMistral,
+  together: fetchModelsFromTogether,
+  cohere: fetchModelsFromCohere,
+  anthropic: fetchModelsFromAnthropic,
+  perplexity: fetchModelsFromPerplexity,
 };

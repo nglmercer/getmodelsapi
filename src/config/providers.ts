@@ -1,4 +1,4 @@
-import { ProviderConfig } from '../types';
+import type { ProviderConfig } from '../types';
 
 export const PROVIDERS: ProviderConfig[] = [
   {
@@ -8,6 +8,61 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKey: process.env.OPENROUTER_API_KEY,
     supportsScraping: true,
     priority: 1,
+    freeTier: false,
+  },
+  {
+    name: 'google',
+    type: 'provider',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    apiKey: process.env.GOOGLE_API_KEY,
+    supportsScraping: false,
+    priority: 2,
+    freeTier: true,
+  },
+  {
+    name: 'mistral',
+    type: 'provider',
+    baseUrl: 'https://api.mistral.ai/v1',
+    apiKey: process.env.MISTRAL_API_KEY,
+    supportsScraping: false,
+    priority: 3,
+    freeTier: true,
+  },
+  {
+    name: 'together',
+    type: 'gateway',
+    baseUrl: 'https://api.together.xyz/v1',
+    apiKey: process.env.TOGETHER_API_KEY,
+    supportsScraping: false,
+    priority: 4,
+    freeTier: true,
+  },
+  {
+    name: 'cohere',
+    type: 'provider',
+    baseUrl: 'https://api.cohere.ai/v1',
+    apiKey: process.env.COHERE_API_KEY,
+    supportsScraping: false,
+    priority: 5,
+    freeTier: true,
+  },
+  {
+    name: 'anthropic',
+    type: 'provider',
+    baseUrl: 'https://api.anthropic.com/v1',
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    supportsScraping: false,
+    priority: 6,
+    freeTier: false,
+  },
+  {
+    name: 'perplexity',
+    type: 'gateway',
+    baseUrl: 'https://api.perplexity.ai',
+    apiKey: process.env.PERPLEXITY_API_KEY,
+    supportsScraping: false,
+    priority: 7,
+    freeTier: false,
   },
   {
     name: 'kilo',
@@ -15,7 +70,8 @@ export const PROVIDERS: ProviderConfig[] = [
     baseUrl: 'https://kilo.ai',
     apiKey: process.env.KILO_API_KEY,
     supportsScraping: true,
-    priority: 2,
+    priority: 8,
+    freeTier: false,
   },
   {
     name: 'groq',
@@ -23,7 +79,8 @@ export const PROVIDERS: ProviderConfig[] = [
     baseUrl: 'https://api.groq.com/openai/v1',
     apiKey: process.env.GROQ_API_KEY,
     supportsScraping: true,
-    priority: 3,
+    priority: 9,
+    freeTier: false,
   },
   {
     name: 'ollama',
@@ -31,7 +88,8 @@ export const PROVIDERS: ProviderConfig[] = [
     baseUrl: 'http://localhost:11434',
     apiKey: undefined,
     supportsScraping: false,
-    priority: 4,
+    priority: 10,
+    freeTier: true,
   },
   {
     name: 'huggingface',
@@ -39,20 +97,7 @@ export const PROVIDERS: ProviderConfig[] = [
     baseUrl: 'https://huggingface.co',
     apiKey: process.env.HUGGINGFACE_API_KEY,
     supportsScraping: true,
-    priority: 5,
+    priority: 11,
+    freeTier: false,
   },
-];
-
-export const PROVIDER_SOURCES = [
-  'openrouter',
-  'kilo',
-  'groq',
-  'ollama',
-  'huggingface',
-  'together',
-  'cohere',
-  'anthropic',
-  'google',
-  'mistral',
-  'perplexity',
 ];
