@@ -1,8 +1,8 @@
 import axios from 'axios';
 import type { Model, ProviderConfig } from '../types';
 
-export { fetchModelsFromKilo } from './kilo';
-export { fetchModelsFromGroq } from './groq';
+import { fetchModelsFromKilo } from './kilo';
+import { fetchModelsFromGroq } from './groq';
 import { fetchModelsFromGoogle } from './google';
 import { fetchModelsFromMistral } from './mistral';
 import { fetchModelsFromTogether } from './together';

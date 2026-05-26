@@ -98,7 +98,7 @@ export async function getModels(options: {
     return fetchModels(gatewayProvider.name, { search, limit, offset });
   }
 
-  const allModels = new Map<string, Model[]>();
+  const allModels = new Map<string, Model>();
   const sortedProviders = sortProvidersByFreeTier(PROVIDERS);
 
   for (const p of sortedProviders) {

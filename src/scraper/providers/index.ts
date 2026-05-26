@@ -1,3 +1,4 @@
+import type { Model } from '../../types';
 export type { Model, ProviderConfig, SearchParams, ApiResponse } from '../../types';
 
 export interface ScraperResult {

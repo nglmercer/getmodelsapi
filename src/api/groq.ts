@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Model, ProviderConfig } from '../types';
+import type { Model, ProviderConfig } from '../types';
 
 export async function fetchModelsFromGroq(provider: ProviderConfig): Promise<Model[]> {
   if (!provider.apiKey) {
