@@ -6,6 +6,7 @@ interface KiloModel {
   name: string;
   description: string;
   openrouterId: string;
+  slug: string;
   contextLength: number;
   maxOutputTokens: number;
   inputModalities: string[];

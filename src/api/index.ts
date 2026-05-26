@@ -1,27 +1,30 @@
 import { PROVIDERS } from '../config/providers';
 import { fetchByProvider } from '../api/providers';
 import { scrapeAllProviders } from '../scraper';
+import { cacheGet as diskCacheGet, cacheSet as diskCacheSet, ONE_HOUR, clearCache } from '../utils/cache';
 import type { Model, ProviderConfig, SearchParams } from '../types';
 
-const modelCache = new Map<string, { data: Model[]; timestamp: number }>();
-const cacheTTL = 300000;
+const FIVE_MINUTES = 300000;
 
-function getCacheKey(provider: string, params: Partial<SearchParams>): string {
-  return `${provider}:${JSON.stringify(params)}`;
-}
+// Two-level cache: in-memory (fast) + disk (persistent)
+const memCache = new Map<string, { data: Model[]; timestamp: number }>();
 
-function getCached(key: string): Model[] | null {
-  const cached = modelCache.get(key);
-  if (!cached) return null;
-  if (Date.now() - cached.timestamp > cacheTTL) {
-    modelCache.delete(key);
+function getMemCached(key: string): Model[] | null {
+  const entry = memCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > FIVE_MINUTES) {
+    memCache.delete(key);
     return null;
   }
-  return cached.data;
+  return entry.data;
 }
 
-function setCache(key: string, data: Model[]): void {
-  modelCache.set(key, { data, timestamp: Date.now() });
+function setMemCache(key: string, data: Model[]): void {
+  memCache.set(key, { data, timestamp: Date.now() });
+}
+
+function getCacheKey(provider: string, params: Partial<SearchParams>): string {
+  return `models:${provider}:${JSON.stringify(params)}`;
 }
 
 function sortProvidersByFreeTier(providers: ProviderConfig[]): ProviderConfig[] {
@@ -35,38 +38,49 @@ function sortProvidersByFreeTier(providers: ProviderConfig[]): ProviderConfig[] 
 
 async function fetchModels(provider: string, params: Partial<SearchParams>): Promise<Model[]> {
   const key = getCacheKey(provider, params);
-  const cached = getCached(key);
-  if (cached) return cached;
 
+  // 1. Try memory cache
+  const memResult = getMemCached(key);
+  if (memResult) return memResult;
+
+  // 2. Try disk cache
+  const diskResult = diskCacheGet<Model[]>(key);
+  if (diskResult) {
+    setMemCache(key, diskResult);
+    return diskResult;
+  }
+
+  // 3. Fetch from provider
   let models: Model[] = [];
 
   const providerConfig = PROVIDERS.find(p => p.name === provider);
   if (providerConfig && fetchByProvider[provider]) {
     try {
       models = await fetchByProvider[provider](providerConfig);
-    } catch (error) {
-      console.error(`API fetch failed for ${provider}, falling back to scraper`);
+    } catch {
+      // fall through to scraper
     }
   }
 
   if (models.length === 0 && providerConfig?.supportsScraping) {
     try {
       const scraperResults = await scrapeAllProviders([providerConfig]);
-      scraperResults.forEach(result => {
+      for (const result of scraperResults) {
         if (result.success && Array.isArray(result.models)) {
           models = models.concat(result.models);
         }
-      });
-    } catch (error) {
-      console.error(`Scraper failed for ${provider}:`, error);
+      }
+    } catch {
+      // provider may be down
     }
   }
 
+  // Apply filters
   if (params.search) {
     const q = params.search.toLowerCase();
     models = models.filter(m =>
       m.name.toLowerCase().includes(q) ||
-      m.description?.toLowerCase().includes(q) ||
+      (m.description?.toLowerCase().includes(q)) ||
       m.id.toLowerCase().includes(q)
     );
   }
@@ -74,7 +88,10 @@ async function fetchModels(provider: string, params: Partial<SearchParams>): Pro
   if (params.limit) models = models.slice(0, params.limit);
   if (params.offset) models = models.slice(params.offset);
 
-  setCache(key, models);
+  // Cache: memory + disk
+  setMemCache(key, models);
+  diskCacheSet(key, models, ONE_HOUR);
+
   return models;
 }
 
@@ -94,9 +111,9 @@ export async function getModels(options: {
   }
 
   if (gateway) {
-    const gatewayProvider = PROVIDERS.find(p => p.name === gateway && p.type === 'gateway');
-    if (!gatewayProvider) return [];
-    return fetchModels(gatewayProvider.name, { search, limit, offset });
+    const gw = PROVIDERS.find(p => p.name === gateway && p.type === 'gateway');
+    if (!gw) return [];
+    return fetchModels(gw.name, { search, limit, offset });
   }
 
   const excludeList = exclude
@@ -104,16 +121,15 @@ export async function getModels(options: {
     : [];
 
   const allModels = new Map<string, Model>();
-  const sortedProviders = sortProvidersByFreeTier(PROVIDERS);
+  const sorted = sortProvidersByFreeTier(PROVIDERS);
 
-  for (const p of sortedProviders) {
+  for (const p of sorted) {
     if (excludeList.includes(p.name)) continue;
-
     try {
-      const providerModels = await fetchModels(p.name, { search, limit, offset });
-      providerModels.forEach(m => allModels.set(m.id, m));
-    } catch (error) {
-      console.error(`Failed to fetch from ${p.name}:`, error);
+      const models = await fetchModels(p.name, { search, limit, offset });
+      for (const m of models) allModels.set(m.id, m);
+    } catch {
+      // skip failed providers
     }
   }
 
@@ -123,7 +139,7 @@ export async function getModels(options: {
     const q = search.toLowerCase();
     models = models.filter(m =>
       m.name.toLowerCase().includes(q) ||
-      m.description?.toLowerCase().includes(q) ||
+      (m.description?.toLowerCase().includes(q)) ||
       m.id.toLowerCase().includes(q)
     );
   }
@@ -149,5 +165,7 @@ export async function getProviders(): Promise<Omit<ProviderConfig, 'apiKey'>[]> 
   }));
 }
 
+export { clearCache };
+export { enrichModel, enrichModels } from '../utils/enrich';
 export { PROVIDERS } from '../config/providers';
 export type { Model, ProviderConfig, SearchParams, ApiResponse } from '../types';

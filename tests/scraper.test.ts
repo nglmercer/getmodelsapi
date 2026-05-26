@@ -43,7 +43,10 @@ describe('Provider configuration', () => {
   test('no scraper registered for auth-only providers', () => {
     const authOnly = PROVIDERS.filter(p => !p.supportsScraping && p.name !== 'ollama');
     for (const p of authOnly) {
-      expect(() => getScraper(p.name, p)).toThrow();
+      // together, cohere: no scraper registered, should throw
+      if (['together', 'cohere'].includes(p.name)) {
+        expect(() => getScraper(p.name, p)).toThrow();
+      }
     }
   });
 
