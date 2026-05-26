@@ -51,6 +51,8 @@ export async function scrapeGoogle(config: ProviderConfig): Promise<ScraperResul
       const section = $(el).nextUntil('h2, h3');
       const descText = section.filter('p').first().text().trim();
 
+      if (models.some(m => m.id === id)) return;
+
       models.push({
         id,
         name: name || id,

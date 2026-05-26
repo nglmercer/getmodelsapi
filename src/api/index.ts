@@ -83,10 +83,11 @@ export async function getModels(options: {
   gateway?: string;
   search?: string;
   free?: boolean;
+  exclude?: string | string[];
   limit?: number;
   offset?: number;
 } = {}): Promise<Model[]> {
-  const { provider, gateway, search, free, limit = 100, offset = 0 } = options;
+  const { provider, gateway, search, free, exclude, limit = 100, offset = 0 } = options;
 
   if (provider) {
     return fetchModels(provider, { search, limit, offset });
@@ -98,10 +99,16 @@ export async function getModels(options: {
     return fetchModels(gatewayProvider.name, { search, limit, offset });
   }
 
+  const excludeList = exclude
+    ? (typeof exclude === 'string' ? [exclude] : exclude)
+    : [];
+
   const allModels = new Map<string, Model>();
   const sortedProviders = sortProvidersByFreeTier(PROVIDERS);
 
   for (const p of sortedProviders) {
+    if (excludeList.includes(p.name)) continue;
+
     try {
       const providerModels = await fetchModels(p.name, { search, limit, offset });
       providerModels.forEach(m => allModels.set(m.id, m));

@@ -42,11 +42,13 @@ export async function scrapeMistral(config: ProviderConfig): Promise<ScraperResu
     const $ = Parser.load(response.data);
     const models: Model[] = [];
 
+    const nonModelHeadings = /why mistral|explore|documentation|build|legal|community|getting started|overview|quickstart|api reference|sdks/i;
+
     $('h2, h3, h4').each((_, el) => {
       const text = $(el).text().trim();
-      const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      if (!id || id.length < 3) return;
+      if (!text || text.length < 3 || nonModelHeadings.test(text)) return;
 
+      const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
       const section = $(el).nextUntil('h2, h3, h4');
       const descText = section.filter('p').first().text().trim();
 
