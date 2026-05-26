@@ -1,117 +1,201 @@
 import { describe, test, expect } from 'bun:test';
 import { PROVIDERS } from '../src/config/providers';
 import { getScraper } from '../src/scraper/providers/factory';
+import { getModels, getProviders } from '../src/api/index';
 import type { ProviderConfig, ScraperResult } from '../src/scraper/providers/index';
 
-describe('Providers', () => {
-  test('should have all expected providers', () => {
-    const names = PROVIDERS.map(p => p.name);
-    expect(names).toContain('google');
-    expect(names).toContain('mistral');
-    expect(names).toContain('openrouter');
-    expect(names).toContain('together');
-    expect(names).toContain('cohere');
-    expect(names).toContain('kilo');
-    expect(names).toContain('groq');
-    expect(names).toContain('huggingface');
-    expect(names).toContain('ollama');
-  });
+// ── Providers that work WITHOUT any API key ──
+// google: scrapes HTML from docs page
+// mistral: scrapes HTML from docs page
+// huggingface: public API, no auth needed
+// ollama: local, no auth needed (may not be running)
 
-  test('should not include providers without public models', () => {
-    const names = PROVIDERS.map(p => p.name);
-    expect(names).not.toContain('anthropic');
-    expect(names).not.toContain('perplexity');
-  });
+const PUBLIC_PROVIDERS = ['google', 'mistral', 'huggingface'] as const;
 
-  test('free-tier providers should be first', () => {
-    const freeProviders = PROVIDERS.filter(p => p.freeTier);
-    const freeNames = freeProviders.map(p => p.name);
-    expect(freeNames).toContain('google');
-    expect(freeNames).toContain('mistral');
-    expect(freeNames).toContain('together');
-    expect(freeNames).toContain('cohere');
-    expect(freeNames).toContain('ollama');
-  });
+function makeConfig(name: string): ProviderConfig {
+  const base = PROVIDERS.find(p => p.name === name);
+  if (!base) throw new Error(`Unknown provider: ${name}`);
+  return { ...base, apiKey: undefined };
+}
 
-  test('providers should have correct types', () => {
+// ── Provider configuration ──
+
+describe('Provider configuration', () => {
+  test('all providers have required fields', () => {
     for (const p of PROVIDERS) {
-      expect(['provider', 'gateway']).toContain(p.type);
       expect(typeof p.name).toBe('string');
+      expect(p.name.length).toBeGreaterThan(0);
+      expect(['provider', 'gateway']).toContain(p.type);
       expect(typeof p.supportsScraping).toBe('boolean');
       expect(typeof p.freeTier).toBe('boolean');
+      expect(typeof p.priority).toBe('number');
+    }
+  });
+
+  test('public providers exist and support scraping', () => {
+    for (const name of PUBLIC_PROVIDERS) {
+      const p = PROVIDERS.find(pr => pr.name === name);
+      expect(p).toBeDefined();
+      expect(p!.supportsScraping).toBe(true);
+    }
+  });
+
+  test('no scraper registered for auth-only providers', () => {
+    const authOnly = PROVIDERS.filter(p => !p.supportsScraping && p.name !== 'ollama');
+    for (const p of authOnly) {
+      expect(() => getScraper(p.name, p)).toThrow();
+    }
+  });
+
+  test('free-tier providers list is correct', () => {
+    const free = PROVIDERS.filter(p => p.freeTier).map(p => p.name);
+    expect(free).toContain('google');
+    expect(free).toContain('mistral');
+    expect(free).toContain('together');
+    expect(free).toContain('cohere');
+    expect(free).toContain('ollama');
+  });
+});
+
+// ── getProviders() ──
+
+describe('getProviders()', () => {
+  test('returns all providers without apiKey exposed', async () => {
+    const providers = await getProviders();
+    expect(providers.length).toBe(PROVIDERS.length);
+    for (const p of providers) {
+      expect(p).not.toHaveProperty('apiKey');
+      expect(typeof p.freeTier).toBe('boolean');
+    }
+  });
+
+  test('sorted by priority', async () => {
+    const providers = await getProviders();
+    for (let i = 1; i < providers.length; i++) {
+      expect(providers[i]!.priority).toBeGreaterThanOrEqual(providers[i - 1]!.priority);
     }
   });
 });
 
-describe('Scraper factory', () => {
-  const baseConfig: ProviderConfig = {
-    name: 'openrouter',
-    type: 'gateway',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    apiKey: undefined,
-    supportsScraping: true,
-    priority: 1,
-    freeTier: false,
-  };
+// ── Scraper execution: public providers must return models ──
 
-  test('should create scraper for openrouter', () => {
-    const fn = getScraper('openrouter', baseConfig);
-    expect(fn).toBeDefined();
-    expect(typeof fn).toBe('function');
-  });
+describe('Scraping without API key', () => {
+  for (const name of PUBLIC_PROVIDERS) {
+    test(`${name} returns models via scraping`, async () => {
+      const config = makeConfig(name);
+      const fn = getScraper(name, config);
+      const result: ScraperResult = await fn();
 
-  test('should create scraper for huggingface', () => {
-    const fn = getScraper('huggingface', { ...baseConfig, name: 'huggingface', type: 'provider', baseUrl: 'https://huggingface.co' });
-    expect(typeof fn).toBe('function');
-  });
+      expect(result.success).toBe(true);
+      expect(Array.isArray(result.models)).toBe(true);
+      expect(result.models.length).toBeGreaterThan(0);
 
-  test('should throw for unknown provider', () => {
-    expect(() => getScraper('unknown', baseConfig)).toThrow('Unknown provider');
-  });
+      for (const model of result.models) {
+        expect(typeof model.id).toBe('string');
+        expect(model.id.length).toBeGreaterThan(0);
+        expect(typeof model.name).toBe('string');
+        expect(typeof model.provider).toBe('string');
+        expect(model.provider.length).toBeGreaterThan(0);
+        expect(typeof model.contextWindow).toBe('number');
+        expect(model.contextWindow).toBeGreaterThan(0);
+        expect(Array.isArray(model.supportedFeatures)).toBe(true);
+      }
+    });
+  }
 
-  test('should create scraper for google', () => {
-    const fn = getScraper('google', { ...baseConfig, name: 'google', type: 'provider', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', freeTier: true });
-    expect(typeof fn).toBe('function');
-  });
-
-  test('should create scraper for mistral', () => {
-    const fn = getScraper('mistral', { ...baseConfig, name: 'mistral', type: 'provider', baseUrl: 'https://api.mistral.ai/v1', freeTier: true });
-    expect(typeof fn).toBe('function');
+  test('ollama scraper handles local-not-running gracefully', async () => {
+    const config = makeConfig('ollama');
+    const fn = getScraper('ollama', config);
+    const result: ScraperResult = await fn();
+    // Ollama may not be running locally
+    expect('success' in result).toBe(true);
+    expect(Array.isArray(result.models)).toBe(true);
   });
 });
 
-describe('Scraper execution', () => {
-  test('should execute openrouter scraper', async () => {
-    const config: ProviderConfig = {
-      name: 'openrouter',
-      type: 'gateway',
-      baseUrl: 'https://openrouter.ai/api/v1',
-      apiKey: undefined,
-      supportsScraping: true,
-      priority: 1,
-      freeTier: false,
-    };
+// ── getModels() library ──
 
-    const fn = getScraper('openrouter', config);
-    const result: ScraperResult = await fn();
-    expect(result).toBeDefined();
-    expect('success' in result).toBe(true);
+describe('getModels()', () => {
+  test('returns models from public providers without API keys', async () => {
+    const models = await getModels();
+    expect(Array.isArray(models)).toBe(true);
+    expect(models.length).toBeGreaterThan(0);
+    for (const m of models) {
+      expect(typeof m.id).toBe('string');
+    }
   });
 
-  test('should execute huggingface scraper', async () => {
-    const config: ProviderConfig = {
-      name: 'huggingface',
-      type: 'provider',
-      baseUrl: 'https://huggingface.co',
-      apiKey: undefined,
-      supportsScraping: true,
-      priority: 8,
-      freeTier: false,
-    };
+  test('getModels({ free: true }) returns only free-tier', async () => {
+    const models = await getModels({ free: true });
+    for (const m of models) {
+      expect(m.freeTier).toBe(true);
+    }
+  });
 
-    const fn = getScraper('huggingface', config);
-    const result: ScraperResult = await fn();
-    expect(result).toBeDefined();
-    expect('success' in result).toBe(true);
+  test('getModels({ provider: "google" }) returns google models', async () => {
+    const models = await getModels({ provider: 'google' });
+    expect(models.length).toBeGreaterThan(0);
+    for (const m of models) {
+      expect(m.provider).toBe('google');
+    }
+  });
+
+  test('getModels({ provider: "mistral" }) returns mistral models', async () => {
+    const models = await getModels({ provider: 'mistral' });
+    expect(models.length).toBeGreaterThan(0);
+    for (const m of models) {
+      expect(m.provider).toBe('mistral');
+    }
+  });
+
+  test('getModels({ provider: "huggingface" }) returns huggingface models', async () => {
+    const models = await getModels({ provider: 'huggingface' });
+    expect(models.length).toBeGreaterThan(0);
+    for (const m of models) {
+      expect(m.provider).toBe('huggingface');
+    }
+  });
+
+  test('getModels({ search: "..." }) filters results', async () => {
+    const models = await getModels({ provider: 'huggingface' });
+    if (models.length > 0) {
+      const term = models[0]!.name.split('/').pop()!.split('-')[0]!;
+      const searched = await getModels({ provider: 'huggingface', search: term });
+      expect(searched.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('getModels({ limit: 5 }) caps results', async () => {
+    const models = await getModels({ provider: 'huggingface', limit: 5 });
+    expect(models.length).toBeLessThanOrEqual(5);
+  });
+});
+
+// ── Deduplication ──
+
+describe('Deduplication', () => {
+  test('no duplicate model IDs', async () => {
+    const models = await getModels();
+    const ids = models.map(m => m.id);
+    const uniqueIds = new Set(ids);
+    expect(uniqueIds.size).toBe(ids.length);
+  });
+});
+
+// ── Cache ──
+
+describe('Cache', () => {
+  test('cached call returns near-instantly', async () => {
+    const opts = { provider: 'huggingface', limit: 10, offset: 99 };
+
+    // First call populates cache
+    await getModels(opts);
+
+    // Second call should be near-instant from cache
+    const t1 = performance.now();
+    await getModels(opts);
+    const secondDuration = performance.now() - t1;
+
+    expect(secondDuration).toBeLessThan(10); // under 10ms = cache hit
   });
 });
