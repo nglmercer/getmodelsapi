@@ -3,7 +3,7 @@ import { getModels } from "../src/api/index";
 
 // Exclude providers you don't want (local, slow, etc.)
 const models = await getModels({
-  exclude: ["ollama", "huggingface"],
+  exclude: ["huggingface", "openrouter"],
   limit: 1000,
 });
 

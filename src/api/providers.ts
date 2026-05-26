@@ -99,7 +99,6 @@ export const fetchByProvider: Record<string, (config: ProviderConfig) => Promise
   openrouter: fetchModelsFromOpenRouter,
   kilo: fetchModelsFromKilo,
   groq: fetchModelsFromGroq,
-  ollama: fetchModelsFromOllama,
   huggingface: fetchModelsFromHuggingFace,
   google: fetchModelsFromGoogle,
   mistral: fetchModelsFromMistral,

@@ -51,7 +51,7 @@ export const PROVIDERS: ProviderConfig[] = [
     type: 'gateway',
     baseUrl: 'https://kilo.ai',
     apiKey: process.env.KILO_API_KEY,
-    supportsScraping: false,
+    supportsScraping: true,
     priority: 6,
     freeTier: false,
   },
@@ -72,14 +72,5 @@ export const PROVIDERS: ProviderConfig[] = [
     supportsScraping: true,
     priority: 8,
     freeTier: false,
-  },
-  {
-    name: 'ollama',
-    type: 'provider',
-    baseUrl: 'http://localhost:11434',
-    apiKey: undefined,
-    supportsScraping: false,
-    priority: 9,
-    freeTier: true,
   },
 ];

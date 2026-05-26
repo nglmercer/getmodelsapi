@@ -8,9 +8,11 @@ import type { ProviderConfig, ScraperResult } from '../src/scraper/providers/ind
 // google: scrapes HTML from docs page
 // mistral: scrapes HTML from docs page
 // huggingface: public API, no auth needed
-// ollama: local, no auth needed (may not be running)
+// openrouter: public API, no auth needed
+// kilo: public API, no auth needed
+// ollama: local, no auth (may not be running)
 
-const PUBLIC_PROVIDERS = ['google', 'mistral', 'huggingface'] as const;
+const PUBLIC_PROVIDERS = ['google', 'mistral', 'huggingface', 'openrouter', 'kilo'] as const;
 
 function makeConfig(name: string): ProviderConfig {
   const base = PROVIDERS.find(p => p.name === name);
@@ -41,12 +43,11 @@ describe('Provider configuration', () => {
   });
 
   test('no scraper registered for auth-only providers', () => {
-    const authOnly = PROVIDERS.filter(p => !p.supportsScraping && p.name !== 'ollama');
-    for (const p of authOnly) {
-      // together, cohere: no scraper registered, should throw
-      if (['together', 'cohere'].includes(p.name)) {
-        expect(() => getScraper(p.name, p)).toThrow();
-      }
+    // together, cohere, groq: no public API, no scraper
+    const authOnly = ['together', 'cohere', 'groq'];
+    for (const name of authOnly) {
+      const config = PROVIDERS.find(p => p.name === name)!;
+      expect(() => getScraper(name, config)).toThrow();
     }
   });
 
