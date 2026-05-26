@@ -12,7 +12,7 @@
 
 # scraping
 - Never use hardcoded/known model fallback data in scrapers — iterate on the scraping logic until it extracts accurate data from the live page. Confidence: 0.85
-- When the listing page lacks context window data, enrich from individual model detail pages or alternative public sources. Confidence: 0.70
+- When the listing page lacks context window data, enrich from individual model detail pages or alternative public sources. Confidence: 0.85
 
 # caching
 - Implement caching for scraped model data to avoid redundant HTTP requests across providers. Confidence: 0.70

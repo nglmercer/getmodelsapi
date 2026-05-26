@@ -67,14 +67,66 @@ function deduceFeatures(name: string, desc: string, id: string): string[] {
   return features;
 }
 
+// Normalize any Google model ID to a comparable key: strip dots/dashes, dates, preview suffixes
+function normalizeForMatch(id: string): string {
+  return id
+    .replace(/^google\//, '')           // strip google/ prefix
+    .replace(/\./g, '-')                // gemini-2.5 → gemini-2-5
+    .replace(/-preview.*$/, '')         // strip -preview* suffixes
+    .replace(/-deprecated$/, '')        // deprecated
+    .replace(/-latest$/, '')
+    .replace(/-0\d{3}$/, '')            // trailing -001
+    .replace(/-2$/, '')                 // trailing -2 suffix (duplicate sections)
+    .replace(/-shut-down$/, '')
+    .replace(/-tts$/, '')
+    .replace(/-live$/, '')
+    .replace(/-lite$/, '')
+    .replace(/-pro$/, '')
+    .replace(/-flash$/, '')
+    .replace(/-max$/, '')
+    .replace(/-research$/, '')
+    .replace(/-image$/, '')
+    .replace(/-robotics$/, '')
+    .replace(/-embedding.*$/, '-embedding')
+    .replace(/--+/g, '-')               // collapse double dashes
+    .replace(/-$/, '');                 // strip trailing dash
+}
+
+async function getContextFromOpenRouter(): Promise<Map<string, number>> {
+  try {
+    const response = await axios.get('https://openrouter.ai/api/v1/models', {
+      timeout: 10000,
+    });
+    const map = new Map<string, number>();
+    if (Array.isArray(response.data?.data)) {
+      for (const m of response.data.data) {
+        if (m.id?.startsWith('google/') && m.context_length > 0) {
+          const key = normalizeForMatch(m.id);
+          const existing = map.get(key);
+          // Prefer higher context window if multiple models map to same key
+          if (!existing || m.context_length > existing) {
+            map.set(key, m.context_length);
+          }
+        }
+      }
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 async function scrapeGooglePage(): Promise<Model[]> {
-  const response = await axios.get('https://ai.google.dev/gemini-api/docs/models', {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 GetModels',
-      'Accept-Language': 'en-US,en;q=0.9',
-    },
-    timeout: 15000,
-  });
+  const [response, ctxMap] = await Promise.all([
+    axios.get('https://ai.google.dev/gemini-api/docs/models', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 GetModels',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      timeout: 15000,
+    }),
+    getContextFromOpenRouter(),
+  ]);
 
   const $ = cheerio.load(response.data);
   const cards = extractCards($);
@@ -86,16 +138,24 @@ async function scrapeGooglePage(): Promise<Model[]> {
       seen.add(c.id);
       return true;
     })
-    .map(c => ({
-      id: c.id,
-      name: c.name,
-      provider: 'google' as const,
-      contextWindow: parseContextWindow(c.description || ''),
-      supportedFeatures: deduceFeatures(c.name, c.description || '', c.id),
-      freeTier: true,
-      url: `https://ai.google.dev/gemini-api/docs/models#${c.rawId}`,
-      description: c.description?.substring(0, 300) || undefined,
-    }));
+    .map(c => {
+      // Scrape whatever the listing page gives
+      const scrapedCtx = parseContextWindow(c.description || '');
+      // Cross-reference with OpenRouter for the real context window
+      const orCtx = ctxMap.get(c.id) || ctxMap.get(c.rawId);
+      const contextWindow = orCtx || scrapedCtx || 32768;
+
+      return {
+        id: c.id,
+        name: c.name,
+        provider: 'google' as const,
+        contextWindow,
+        supportedFeatures: deduceFeatures(c.name, c.description || '', c.id),
+        freeTier: true,
+        url: `https://ai.google.dev/gemini-api/docs/models#${c.rawId}`,
+        description: c.description?.substring(0, 300) || undefined,
+      };
+    });
 }
 
 export async function scrapeGoogle(config: ProviderConfig): Promise<ScraperResult> {

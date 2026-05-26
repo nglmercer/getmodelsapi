@@ -1,11 +1,25 @@
 import "dotenv/config";
 import { getModels } from "../src/api/index";
 
-// Exclude providers you don't want (local, slow, etc.)
+// Exclude specific providers
 const models = await getModels({
+  exclude: ["huggingface", "openrouter"],
   free: true,
-  limit: 1000,
 });
 
-console.log(`Models (excluding huggingface): ${models.length}`);
-console.log(models);
+console.log(`Models (excluding huggingface & openrouter): ${models.length}`);
+for (const m of models) {
+  console.log(
+    `  [${m.provider}] ${m.name} ctx=${m.contextWindow.toLocaleString()} `,
+  );
+}
+
+// Exclude also works with single provider
+const googleOnly = await getModels({ provider: "google" });
+const googleExcluded = await getModels({ exclude: "google", limit: 3 });
+console.log(`\nGoogle models: ${googleOnly.length}`);
+console.log(
+  `Without google: ${googleExcluded.length} (should not include google)`,
+);
+const hasGoogle = googleExcluded.some((m) => m.provider === "google");
+console.log(`Has google? ${hasGoogle} (should be false)`);
