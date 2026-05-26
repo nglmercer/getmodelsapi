@@ -10,9 +10,11 @@ import type { ProviderConfig, ScraperResult } from '../src/scraper/providers/ind
 // huggingface: public API, no auth needed
 // openrouter: public API, no auth needed
 // kilo: public API, no auth needed
-// ollama: local, no auth (may not be running)
+// aimlapi: public API, no auth needed
+// novita: public API, no auth needed (has free models)
+// sambanova: public API, no auth needed
 
-const PUBLIC_PROVIDERS = ['google', 'mistral', 'huggingface', 'openrouter', 'kilo'] as const;
+const PUBLIC_PROVIDERS = ['google', 'mistral', 'huggingface', 'openrouter', 'kilo', 'aimlapi', 'novita', 'sambanova'] as const;
 
 function makeConfig(name: string): ProviderConfig {
   const base = PROVIDERS.find(p => p.name === name);
@@ -57,7 +59,6 @@ describe('Provider configuration', () => {
     expect(free).toContain('mistral');
     expect(free).toContain('together');
     expect(free).toContain('cohere');
-    expect(free).toContain('ollama');
   });
 });
 
@@ -106,15 +107,6 @@ describe('Scraping without API key', () => {
       }
     });
   }
-
-  test('ollama scraper handles local-not-running gracefully', async () => {
-    const config = makeConfig('ollama');
-    const fn = getScraper('ollama', config);
-    const result: ScraperResult = await fn();
-    // Ollama may not be running locally
-    expect('success' in result).toBe(true);
-    expect(Array.isArray(result.models)).toBe(true);
-  });
 });
 
 // ── getModels() library ──

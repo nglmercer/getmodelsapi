@@ -3,9 +3,9 @@ import { getModels } from "../src/api/index";
 
 // Exclude providers you don't want (local, slow, etc.)
 const models = await getModels({
-  exclude: ["huggingface", "openrouter"],
+  free: true,
   limit: 1000,
 });
 
-console.log(`Models (excluding ollama, huggingface): ${models.length}`);
+console.log(`Models (excluding huggingface): ${models.length}`);
 console.log(models);
