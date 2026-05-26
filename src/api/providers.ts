@@ -7,21 +7,6 @@ import { fetchModelsFromGoogle } from './google';
 import { fetchModelsFromMistral } from './mistral';
 import { fetchModelsFromTogether } from './together';
 import { fetchModelsFromCohere } from './cohere';
-import { fetchModelsFromAnthropic } from './anthropic';
-import { fetchModelsFromPerplexity } from './perplexity';
-
-interface OpenRouterModel {
-  id: string;
-  name: string;
-  context_length: number;
-  context_window: number;
-  pricing?: {
-    prompt?: number;
-    completion?: number;
-  };
-  description?: string;
-  provider: string;
-}
 
 export async function fetchModelsFromOpenRouter(provider: ProviderConfig): Promise<Model[]> {
   if (!provider.apiKey) {
@@ -41,11 +26,10 @@ export async function fetchModelsFromOpenRouter(provider: ProviderConfig): Promi
       }
     );
 
-    const models: Model[] = response.data.data.map((model: OpenRouterModel) => ({
+    const models: Model[] = response.data.data.map((model: any) => ({
       id: model.id,
       name: model.name,
       provider: model.provider || provider.name,
-      gateway: provider.name,
       contextWindow: model.context_window || model.context_length,
       supportedFeatures: ['chat', 'completion'],
       pricing: model.pricing,
@@ -70,7 +54,6 @@ export async function fetchModelsFromOllama(provider: ProviderConfig): Promise<M
       id: model.name,
       name: model.name,
       provider: provider.name,
-      gateway: provider.name,
       contextWindow: 4096,
       supportedFeatures: ['chat', 'completion'],
       url: `http://localhost:11434/api/show/${model.name}`,
@@ -99,7 +82,6 @@ export async function fetchModelsFromHuggingFace(provider: ProviderConfig): Prom
       id: model.id,
       name: model.id,
       provider: provider.name,
-      gateway: provider.name,
       contextWindow: model.config?.max_position_embeddings || 4096,
       supportedFeatures: model.config?.supports_prompt_completion_protocol ? ['chat', 'completion'] : ['completion'],
       url: `https://huggingface.co/${model.id}`,
@@ -113,7 +95,7 @@ export async function fetchModelsFromHuggingFace(provider: ProviderConfig): Prom
   }
 }
 
-export const fetchModelsByProvider: Record<string, (config: ProviderConfig) => Promise<Model[]>> = {
+export const fetchByProvider: Record<string, (config: ProviderConfig) => Promise<Model[]>> = {
   openrouter: fetchModelsFromOpenRouter,
   kilo: fetchModelsFromKilo,
   groq: fetchModelsFromGroq,
@@ -123,6 +105,4 @@ export const fetchModelsByProvider: Record<string, (config: ProviderConfig) => P
   mistral: fetchModelsFromMistral,
   together: fetchModelsFromTogether,
   cohere: fetchModelsFromCohere,
-  anthropic: fetchModelsFromAnthropic,
-  perplexity: fetchModelsFromPerplexity,
 };
