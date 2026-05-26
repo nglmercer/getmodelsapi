@@ -1,6 +1,6 @@
-import http from '../utils/http';
-import type { Model } from '../types';
-import { cacheGet, cacheSet, ONE_HOUR } from './cache';
+import http from "../utils/http";
+import type { Model } from "../types";
+import { cacheGet, cacheSet, ONE_HOUR } from "./cache";
 
 interface OpenRouterModel {
   id: string;
@@ -8,22 +8,24 @@ interface OpenRouterModel {
 }
 
 async function getGoogleContextWindows(): Promise<Map<string, number>> {
-  const cacheKey = 'crossref-openrouter-context';
+  const cacheKey = "crossref-openrouter-context";
   const cached = cacheGet<Map<string, number>>(cacheKey);
   if (cached) return cached;
 
   const map = new Map<string, number>();
 
   try {
-    const response = await axios.get('https://openrouter.ai/api/v1/models', { timeout: 15000 });
+    const response = await http.get("https://openrouter.ai/api/v1/models", {
+      timeout: 15000,
+    });
     if (Array.isArray(response.data?.data)) {
       for (const m of response.data.data as OpenRouterModel[]) {
-        if (m.id.startsWith('google/') && m.context_length > 0) {
+        if (m.id.startsWith("google/") && m.context_length > 0) {
           // "google/gemini-2.5-flash" → "gemini-2.5-flash"
-          const name = m.id.replace('google/', '');
+          const name = m.id.replace("google/", "");
           map.set(name, m.context_length);
           // Also index by slug variants
-          map.set(name.replace(/-preview-\d{2}-\d{4}$/, ''), m.context_length);
+          map.set(name.replace(/-preview-\d{2}-\d{4}$/, ""), m.context_length);
         }
       }
     }
@@ -38,8 +40,8 @@ async function getGoogleContextWindows(): Promise<Map<string, number>> {
 async function scrapeGoogleModelPage(modelId: string): Promise<number | null> {
   try {
     const url = `https://ai.google.dev/gemini-api/docs/models/${modelId}`;
-    const response = await axios.get(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 GetModels' },
+    const response = await http.get(url, {
+      headers: { "User-Agent": "Mozilla/5.0 GetModels" },
       timeout: 8000,
     });
 
@@ -55,11 +57,13 @@ async function scrapeGoogleModelPage(modelId: string): Promise<number | null> {
 
     // Try raw number with "input token"
     const inputMatch = html.match(/input\s+token\s+limit[^<]*?(\d[\d,]*)/i);
-    if (inputMatch?.[1]) return parseInt(inputMatch[1].replace(/,/g, ''), 10);
+    if (inputMatch?.[1]) return parseInt(inputMatch[1].replace(/,/g, ""), 10);
 
     // Try context window number
-    const ctxMatch = html.match(/context\s*(?:length|window)\s*(?::|is|of)?\s*(\d[\d,]*)/i);
-    if (ctxMatch?.[1]) return parseInt(ctxMatch[1].replace(/,/g, ''), 10);
+    const ctxMatch = html.match(
+      /context\s*(?:length|window)\s*(?::|is|of)?\s*(\d[\d,]*)/i,
+    );
+    if (ctxMatch?.[1]) return parseInt(ctxMatch[1].replace(/,/g, ""), 10);
 
     return null;
   } catch {
@@ -71,7 +75,7 @@ async function enrichGoogleModel(model: Model): Promise<Model> {
   if (model.contextWindow > 40000) return model; // already enriched
 
   const cacheKey = `enrich-google-${model.id}`;
-  const cached = cacheGet<Pick<Model, 'contextWindow'>>(cacheKey);
+  const cached = cacheGet<Pick<Model, "contextWindow">>(cacheKey);
   if (cached) return { ...model, ...cached };
 
   // Method 1: Cross-reference with OpenRouter (cached)
@@ -93,7 +97,7 @@ async function enrichGoogleModel(model: Model): Promise<Model> {
 }
 
 export async function enrichModel(model: Model): Promise<Model> {
-  if (model.provider === 'google' && model.contextWindow < 40000) {
+  if (model.provider === "google" && model.contextWindow < 40000) {
     return enrichGoogleModel(model);
   }
   return model;
