@@ -56,7 +56,7 @@ function parseOpenRouterPricing(pricingText: string): { prompt: number; completi
   const promptMatch = pricingText.match(/Prompt: \$?([\d\.]+)/);
   const completionMatch = pricingText.match(/Completion: \$?([\d\.]+)/);
 
-  if (promptMatch && completionMatch) {
+  if (promptMatch?.[1] && completionMatch?.[1]) {
     return {
       prompt: parseFloat(promptMatch[1]),
       completion: parseFloat(completionMatch[1]),

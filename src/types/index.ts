@@ -11,6 +11,7 @@ export interface Model {
   };
   url?: string;
   description?: string;
+  freeTier?: boolean;
 }
 
 export interface SearchParams {
