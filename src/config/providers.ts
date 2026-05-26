@@ -24,7 +24,7 @@ export const PROVIDERS: ProviderConfig[] = [
     type: 'gateway',
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: process.env.OPENROUTER_API_KEY,
-    supportsScraping: false,
+    supportsScraping: true,
     priority: 3,
     freeTier: false,
   },

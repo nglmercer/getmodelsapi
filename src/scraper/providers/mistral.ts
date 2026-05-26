@@ -1,72 +1,171 @@
 import axios from 'axios';
-import axiosRetry from 'axios-retry';
-import * as Parser from 'cheerio';
+import * as cheerio from 'cheerio';
 import type { Model, ProviderConfig, ScraperResult } from './index';
 
-axiosRetry(axios, {
-  retries: 3,
-  retryDelay: axiosRetry.exponentialDelay,
-  retryCondition: (error) => error.response?.status !== 429,
-});
+const NAV_HEADINGS = /why mistral|explore|documentation|build|legal|community|getting started|overview|quickstart|api reference|sdks|index|featured models|frontier models|generalist|specialist|other models|legacy|deprecated|search/i;
+
+function parseContextWindow(text: string): number {
+  // Look for "32k", "128k", "256k", "131k", "1M", "2M", raw numbers
+  const patterns = [
+    /(\d+)\s*m(?:illion)?\s*(?:token|context)/i,
+    /(\d+)\s*tokens?\s*(?:context|window)/i,
+    /context\s*(?:window|length).*?(\d[\d,]*)\s*[km]/i,
+    /(\d+)\s*k\s*(?:token|context)/i,
+    /(\d[\d,]*)\s*token/i,
+  ];
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m?.[1]) {
+      let n = parseInt(m[1].replace(/,/g, ''), 10);
+      if (p.toString().includes('k')) n *= 1000;
+      if (p.toString().includes('million') || /m/i.test(m[0])) n *= 1000000;
+      return n;
+    }
+  }
+  return 32768;
+}
+
+// Deduce features from model name/description
+function deduceFeatures(id: string, description: string, name: string): string[] {
+  const text = (name + ' ' + description + ' ' + id).toLowerCase();
+  const features: string[] = [];
+
+  if (text.includes('embed') || text.includes('embedding')) return ['embeddings'];
+  if (text.includes('moderation')) return ['moderation'];
+  if (text.includes('ocr')) return ['ocr'];
+  if (text.includes('tts') || text.includes('transcribe') || text.includes('speech') || text.includes('audio')) return ['audio', 'tts'];
+  if (text.includes('vision') || text.includes('image') || id.includes('pixtral')) features.push('vision');
+  if (text.includes('code') || id.includes('codestral') || id.includes('devstral') || id.includes('leanstral')) features.push('code');
+
+  features.push('chat');
+  return features;
+}
+
+async function scrapeMistralPage(): Promise<Model[]> {
+  const response = await axios.get('https://docs.mistral.ai/getting-started/models/', {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 GetModels',
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
+    timeout: 15000,
+  });
+
+  const $ = cheerio.load(response.data);
+  const seen = new Set<string>();
+
+  // Collect model API IDs from the deprecation table (col index 2)
+  const tableModels = new Map<string, string>(); // display name -> apiId
+  $('table').last().find('tr').each((_, row) => {
+    const cells = $(row).find('td');
+    if (cells.length < 3) return;
+    const displayName = cells.eq(0).text().trim();
+    const apiId = cells.eq(2).text().trim();
+    if (apiId && displayName && apiId.length > 3 && !apiId.includes(' ') && displayName.length > 3 && displayName !== 'Model') {
+      // Clean display name: remove " ↗" suffix
+      const cleanName = displayName.replace(/\s*↗$/, '').trim();
+      if (!tableModels.has(cleanName)) {
+        tableModels.set(cleanName, apiId);
+      }
+    }
+  });
+
+  // Now extract current models from headings
+  const models: Model[] = [];
+  $('h2, h3, h4').each((_, el) => {
+    const text = $(el).text().trim();
+    if (!text || text.length < 3) return;
+    if (NAV_HEADINGS.test(text)) return;
+
+    // Must be a model-like heading
+    const isModelHeading = /mistral|pixtral|ministral|codestral|voxtral|magistral|devstral|leanstral|embed|ocr|moderation/i;
+    if (!isModelHeading.test(text)) return;
+
+    const name = text;
+    const $section = $(el).nextUntil('h2, h3, h4');
+    const description = $section.filter('p').first().text().trim() || undefined;
+    const sectionText = description || '';
+
+    // Generate a clean ID from the API table or the heading
+    let id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+    // Try to match against known API IDs in the table
+    const tableId = tableModels.get(name);
+    if (tableId) id = tableId;
+
+    if (seen.has(id)) return;
+    seen.add(id);
+
+    const contextWindow = parseContextWindow(sectionText);
+    const features = deduceFeatures(id, sectionText, name);
+
+    models.push({
+      id,
+      name,
+      provider: 'mistral',
+      contextWindow,
+      supportedFeatures: features,
+      freeTier: true,
+      url: `https://docs.mistral.ai/getting-started/models/#${id}`,
+      description,
+    });
+  });
+
+  // Fallback: if heading extraction found little, use table data directly
+  if (models.length === 0) {
+    for (const [displayName, apiId] of tableModels) {
+      if (seen.has(apiId)) continue;
+      seen.add(apiId);
+
+      // Skip labs/experimental
+      if (apiId.startsWith('labs-')) continue;
+
+      models.push({
+        id: apiId,
+        name: displayName,
+        provider: 'mistral',
+        contextWindow: 32768,
+        supportedFeatures: deduceFeatures(apiId, '', displayName),
+        freeTier: true,
+        url: `https://docs.mistral.ai/getting-started/models/#${apiId}`,
+      });
+    }
+  }
+
+  return models;
+}
 
 export async function scrapeMistral(config: ProviderConfig): Promise<ScraperResult> {
-  try {
-    if (config.apiKey) {
+  if (config.apiKey) {
+    try {
       const response = await axios.get(`${config.baseUrl}/models`, {
         headers: { 'Authorization': `Bearer ${config.apiKey}` },
         timeout: 10000,
       });
 
-      const models: Model[] = (response.data.data || []).map((m: any) => ({
-        id: m.id,
-        name: m.id,
-        provider: 'mistral',
-        contextWindow: m.max_context_length || 32768,
-        supportedFeatures: ['chat', 'completion'],
-        freeTier: true,
-        url: `https://docs.mistral.ai/getting-started/models/#${m.id}`,
-        description: m.owned_by ? `Owned by ${m.owned_by}` : undefined,
-      }));
+      const models: Model[] = (response.data.data || []).map((m: any) => {
+        const name = m.id;
+        return {
+          id: name,
+          name,
+          provider: 'mistral',
+          contextWindow: m.max_context_length || 32768,
+          supportedFeatures: ['chat'],
+          freeTier: true,
+          url: `https://docs.mistral.ai/getting-started/models/#${name}`,
+          description: m.owned_by ? `Owned by ${m.owned_by}` : undefined,
+        };
+      });
 
       return { success: true, models };
+    } catch (error) {
+      console.error('Mistral API failed, falling back to scraper');
     }
+  }
 
-    const response = await axios.get('https://docs.mistral.ai/getting-started/models/', {
-      headers: {
-        'User-Agent': 'GetModels API Scraper',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      timeout: 15000,
-    });
-
-    const $ = Parser.load(response.data);
-    const models: Model[] = [];
-
-    const nonModelHeadings = /why mistral|explore|documentation|build|legal|community|getting started|overview|quickstart|api reference|sdks/i;
-
-    $('h2, h3, h4').each((_, el) => {
-      const text = $(el).text().trim();
-      if (!text || text.length < 3 || nonModelHeadings.test(text)) return;
-
-      const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      const section = $(el).nextUntil('h2, h3, h4');
-      const descText = section.filter('p').first().text().trim();
-
-      models.push({
-        id,
-        name: text,
-        provider: 'mistral',
-        contextWindow: 32768,
-        supportedFeatures: ['chat'],
-        freeTier: true,
-        url: `https://docs.mistral.ai/getting-started/models/#${id}`,
-        description: descText.substring(0, 200) || undefined,
-      });
-    });
-
+  try {
+    const models = await scrapeMistralPage();
     return { success: true, models };
   } catch (error) {
-    console.error('Failed to scrape Mistral:', error);
     return {
       success: false,
       models: [],
