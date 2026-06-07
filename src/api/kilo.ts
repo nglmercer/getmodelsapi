@@ -19,7 +19,16 @@ export async function fetchModelsFromKilo(provider: ProviderConfig): Promise<Mod
       }
     );
 
-    const models: Model[] = response.data.models.map((model: any) => ({
+interface KiloAPIResponse {
+  id: string;
+  name: string;
+  provider?: string;
+  context_window?: number;
+  pricing?: { prompt?: string; completion?: string };
+  description?: string;
+}
+
+    const models: Model[] = response.data.models.map((model: KiloAPIResponse) => ({
       id: model.id,
       name: model.name,
       provider: model.provider || provider.name,

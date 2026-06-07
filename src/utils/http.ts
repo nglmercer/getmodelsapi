@@ -89,12 +89,14 @@ async function get<T = any>(url: string, config: HttpConfig = {}): Promise<HttpR
         statusText: response.statusText,
         headers: response.headers,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearTimeout(timeoutId);
       if (error instanceof HttpError) {
         lastError = error;
+      } else if (error instanceof Error) {
+        lastError = new HttpError(error.message);
       } else {
-        lastError = new HttpError(error.message || String(error));
+        lastError = new HttpError(String(error));
       }
       if (
         attempt < _retryConfig.retries &&

@@ -8,6 +8,21 @@ import { fetchModelsFromMistral } from "./mistral";
 import { fetchModelsFromTogether } from "./together";
 import { fetchModelsFromCohere } from "./cohere";
 
+interface OllamaAPIResponse {
+  name: string;
+}
+
+interface HuggingFaceModel {
+  id: string;
+  config?: {
+    max_position_embeddings?: number;
+    supports_prompt_completion_protocol?: boolean;
+  };
+  cardData?: {
+    description?: string;
+  };
+}
+
 export async function fetchModelsFromOpenRouter(
   provider: ProviderConfig,
 ): Promise<Model[]> {
@@ -25,7 +40,7 @@ export async function fetchModelsFromOpenRouter(
       timeout: 10000,
     });
 
-    const models: Model[] = response.data.data.map((model: any) => ({
+    const models: Model[] = response.data.data.map((model: { id: string; name: string; provider?: string; context_window?: number; context_length?: number; pricing?: { prompt?: string; completion?: string }; description?: string }) => ({
       id: model.id,
       name: model.name,
       provider: model.provider || provider.name,
@@ -51,7 +66,7 @@ export async function fetchModelsFromOllama(
       timeout: 10000,
     });
 
-    const models: Model[] = response.data.models.map((model: any) => ({
+    const models: Model[] = response.data.models.map((model: OllamaAPIResponse) => ({
       id: model.name,
       name: model.name,
       provider: provider.name,
@@ -81,7 +96,7 @@ export async function fetchModelsFromHuggingFace(
       },
     );
 
-    const models: Model[] = response.data.map((model: any) => ({
+    const models: Model[] = response.data.map((model: HuggingFaceModel) => ({
       id: model.id,
       name: model.id,
       provider: provider.name,

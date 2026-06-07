@@ -22,7 +22,18 @@ export async function scrapeHuggingFace(
       },
     );
 
-    const models: Model[] = response.data.map((model: any) => ({
+interface HuggingFaceAPIResponse {
+  id: string;
+  config?: {
+    max_position_embeddings?: number;
+    supports_prompt_completion_protocol?: boolean;
+  };
+  cardData?: {
+    description?: string;
+  };
+}
+
+    const models: Model[] = response.data.map((model: HuggingFaceAPIResponse) => ({
       id: model.id,
       name: model.id,
       provider: "huggingface",

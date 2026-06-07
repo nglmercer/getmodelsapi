@@ -19,7 +19,16 @@ export async function fetchModelsFromGroq(provider: ProviderConfig): Promise<Mod
       }
     );
 
-    const models: Model[] = response.data.map((model: any) => ({
+interface GroqAPIResponse {
+  id: string;
+  name: string;
+  provider?: string;
+  context_window?: number;
+  pricing?: { prompt?: string; completion?: string };
+  description?: string;
+}
+
+    const models: Model[] = response.data.map((model: GroqAPIResponse) => ({
       id: model.id,
       name: model.name,
       provider: model.provider || provider.name,

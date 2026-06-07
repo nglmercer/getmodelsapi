@@ -196,7 +196,16 @@ export async function scrapeGoogle(
         timeout: 10000,
       });
 
-      const models: Model[] = (response.data.models || []).map((m: any) => {
+interface GeminiAPIResponse {
+  name: string;
+  displayName?: string;
+  description?: string;
+  inputTokenLimit?: number;
+  outputTokenLimit?: number;
+  supportedGenerationMethods?: string[];
+}
+
+      const models: Model[] = (response.data.models || []).map((m: GeminiAPIResponse) => {
         const methods: string[] = m.supportedGenerationMethods || [];
         const features: string[] = [];
         if (

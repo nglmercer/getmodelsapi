@@ -236,7 +236,7 @@ export async function scrapeMistral(
         timeout: 10000,
       });
 
-      const models: Model[] = (response.data.data || []).map((m: any) => {
+      const models: Model[] = (response.data.data || []).map((m: { id: string; max_context_length?: number; owned_by?: string }) => {
         const name = m.id;
         return {
           id: name,
